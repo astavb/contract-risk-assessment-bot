@@ -1,69 +1,48 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from datetime import datetime
 import os
+from datetime import datetime
 
 
-def generate_pdf(
-    output_path: str,
-    contract_type: str,
-    overall_risk: str,
-    total_clauses: int,
-    clause_summary: list
-) -> str:
+def generate_pdf(overall_risk: str, total_clauses: int) -> str:
     """
-    Generates a professional PDF risk summary
+    Generates a professional PDF summary of contract risk.
+    Compatible with Streamlit Cloud.
     """
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs("exports", exist_ok=True)
 
-    c = canvas.Canvas(output_path, pagesize=A4)
+    filename = f"exports/contract_risk_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    c = canvas.Canvas(filename, pagesize=A4)
     width, height = A4
 
-    y = height - 1 * inch
+    y = height - 80
 
     # Title
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(1 * inch, y, "Contract Risk Summary")
-    y -= 30
+    c.drawString(60, y, "Contract Risk Summary")
+    y -= 40
 
-    # Meta info
-    c.setFont("Helvetica", 11)
-    c.drawString(1 * inch, y, f"Contract Type: {contract_type}")
-    y -= 18
-    c.drawString(1 * inch, y, f"Overall Risk Level: {overall_risk}")
-    y -= 18
-    c.drawString(1 * inch, y, f"Total Clauses Analyzed: {total_clauses}")
-    y -= 18
-    c.drawString(1 * inch, y, f"Generated on: {datetime.now().strftime('%d %b %Y, %H:%M')}")
-    y -= 30
+    # Content
+    c.setFont("Helvetica", 12)
+    c.drawString(60, y, f"Overall Risk Level: {overall_risk}")
+    y -= 25
 
-    # Clause summary
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(1 * inch, y, "Clause Risk Breakdown")
-    y -= 20
+    c.drawString(60, y, f"Total Clauses Analyzed: {total_clauses}")
+    y -= 40
 
-    c.setFont("Helvetica", 10)
-
-    for idx, clause in enumerate(clause_summary, start=1):
-        if y < 1 * inch:
-            c.showPage()
-            y = height - 1 * inch
-            c.setFont("Helvetica", 10)
-
-        text = f"Clause {idx}: {clause['risk']} Risk"
-        c.drawString(1 * inch, y, text)
-        y -= 14
-
-    # Footer
-    y -= 20
-    c.setFont("Helvetica-Oblique", 9)
+    # Disclaimer
+    c.setFont("Helvetica-Oblique", 10)
     c.drawString(
-        1 * inch,
+        60,
         y,
-        "Disclaimer: This report is for informational purposes only and does not constitute legal advice."
+        "This report is for awareness only and does not constitute legal advice."
     )
 
+    c.showPage()
     c.save()
-    return output_path
+
+    return filename
+
+
