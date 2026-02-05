@@ -151,18 +151,19 @@ if uploaded_file:
 
         # ---------------- PDF EXPORT ----------------
         if st.button("Export Risk Summary as PDF"):
-    pdf_path = generate_pdf(
-        overall_risk=overall_risk,
-        total_clauses=len(clause_results)
-    )
+            pdf_path = generate_pdf(
+                overall_risk=overall_risk,
+                total_clauses=len(clause_results)
+            )
 
-    with open(pdf_path, "rb") as f:
-        st.download_button(
-            label="⬇ Download PDF",
-            data=f,
-            file_name="contract_risk_summary.pdf",
-            mime="application/pdf"
-        )
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label="⬇ Download PDF",
+                    data=f,
+                    file_name="contract_risk_summary.pdf",
+                    mime="application/pdf"
+                )
+
 
 
 
