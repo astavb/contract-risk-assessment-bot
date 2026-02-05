@@ -1,46 +1,51 @@
 import streamlit as st
+
 from utils import extract_text, detect_language
 from clause_extraction import extract_clauses
 from nlp_pipeline import analyze_clause
-from risk_engine import assess_risk
+from risk_engine import (
+    detect_clause_types,
+    assess_risk_level,
+    contract_risk_score
+)
 from pdf_export import generate_pdf
 from audit_logger import log_audit
-import os
 
-
-# Page Config
-
+# -------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------
 st.set_page_config(
     page_title="Contract Analysis & Risk Assessment Bot",
     layout="wide"
 )
 
-
-# Header UI
-
-st.markdown("""
-<h1 style='text-align:center;'>Contract Analysis & Risk Assessment Bot</h1>
-<p style='text-align:center; color:gray;'>
-GenAI-powered legal risk assistant for Indian SMEs
-</p>
-""", unsafe_allow_html=True)
-
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
+st.markdown(
+    "<h1 style='text-align:center;'>Contract Analysis & Risk Assessment Bot</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='text-align:center;color:gray;'>GenAI-powered legal risk assistant for Indian SMEs</p>",
+    unsafe_allow_html=True
+)
 st.markdown("---")
 
-
-# Upload Section
-
+# -------------------------------------------------
+# UPLOAD SECTION
+# -------------------------------------------------
 uploaded_file = st.file_uploader(
     "Upload your contract (PDF, DOCX, TXT)",
     type=["pdf", "docx", "txt"]
 )
 
 st.caption("Files are processed locally. No data is shared.")
-st.warning("This tool provides automated risk insights for informational purposes only and does not constitute legal advice.")
+st.warning("This tool provides automated contract risk insights for informational purposes only.")
 
-
-# Main Logic
-
+# -------------------------------------------------
+# MAIN LOGIC
+# -------------------------------------------------
 if uploaded_file:
     with st.spinner("Reading contract..."):
         text = extract_text(uploaded_file)
@@ -51,71 +56,74 @@ if uploaded_file:
     clauses = extract_clauses(text)
 
     if not clauses:
-        st.error("No clauses detected in the document.")
+        st.error("No clauses detected in the uploaded document.")
         st.stop()
 
     clause_results = []
-    risk_counts = {"High": 0, "Medium": 0, "Low": 0}
+    risk_levels = []
 
-   
-    # Analyze Each Clause
-  
+    # -------------------------------------------------
+    # CLAUSE ANALYSIS
+    # -------------------------------------------------
     for idx, clause in enumerate(clauses, start=1):
         nlp_result = analyze_clause(clause)
-        risk = assess_risk(clause)
+        clause_types = detect_clause_types(clause)
+        risk_level = assess_risk_level(clause)
 
-        risk_counts[risk] += 1
+        risk_levels.append(risk_level)
 
         clause_results.append({
             "index": idx,
             "text": clause,
-            "risk": risk,
+            "risk": risk_level,
+            "clause_types": clause_types,
             "entities": nlp_result.get("entities", []),
             "has_obligation": nlp_result.get("has_obligation", False),
             "has_prohibition": nlp_result.get("has_prohibition", False),
             "has_right": nlp_result.get("has_right", False)
         })
 
-    
-    # Overview Section
-   
+    # -------------------------------------------------
+    # OVERVIEW
+    # -------------------------------------------------
     st.markdown("## Contract Overview")
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Clauses", len(clauses))
-    col2.metric("High Risk", risk_counts["High"])
-    col3.metric("Medium Risk", risk_counts["Medium"])
-    col4.metric("Low Risk", risk_counts["Low"])
+    col2.metric("High Risk", risk_levels.count("High"))
+    col3.metric("Medium Risk", risk_levels.count("Medium"))
+    col4.metric("Low Risk", risk_levels.count("Low"))
 
     st.markdown("---")
 
-   
-    # Clause-by-Clause UI
-  
+    # -------------------------------------------------
+    # CLAUSE-BY-CLAUSE DISPLAY
+    # -------------------------------------------------
     st.markdown("## Clause-by-Clause Analysis")
 
     for result in clause_results:
-        risk_color = {
-            "High": "red",
-            "Medium": "orange",
-            "Low": "green"
-        }[result["risk"]]
-
         with st.expander(f"Clause {result['index']} | {result['risk']} Risk"):
-            st.markdown(f"<b>Clause Text</b><br>{result['text']}", unsafe_allow_html=True)
+            st.markdown("**Clause Text**")
+            st.write(result["text"])
 
-            st.markdown(f"<br><b>Risk Level:</b> <span style='color:{risk_color}'>{result['risk']}</span>", unsafe_allow_html=True)
-
-            # Plain-English Explanation
+            # Risk explanation
             if result["risk"] == "High":
-                st.error("This clause may create significant legal or financial exposure and should be reviewed carefully.")
+                st.error("This clause poses a significant legal or financial risk for SMEs.")
             elif result["risk"] == "Medium":
-                st.warning("This clause may have moderate implications depending on enforcement.")
+                st.warning("This clause may require review depending on business context.")
             else:
-                st.success("This clause appears informational and does not pose immediate legal risk.")
+                st.success("This clause is informational and low risk.")
 
-            # Obligations / Rights / Prohibitions
-            st.markdown("**Legal Signals Detected:**")
+            # Clause types
+            st.markdown("**Detected Clause Types**")
+            if result["clause_types"]:
+                for ct in result["clause_types"]:
+                    st.write(f"- {ct}")
+            else:
+                st.write("General")
+
+            # Legal signals
+            st.markdown("**Legal Signals**")
             signals = []
             if result["has_obligation"]:
                 signals.append("Obligation")
@@ -124,56 +132,53 @@ if uploaded_file:
             if result["has_right"]:
                 signals.append("Right")
 
-            if signals:
-                st.write(", ".join(signals))
-            else:
-                st.write("None")
+            st.write(", ".join(signals) if signals else "None")
 
-            # Named Entities
+            # Named entities
             if result["entities"]:
-                st.markdown("**Named Entities:**")
+                st.markdown("**Named Entities**")
                 for ent, label in result["entities"]:
                     st.write(f"- {ent} ({label})")
 
- 
-    # Overall Risk
-  
+    # -------------------------------------------------
+    # OVERALL RISK
+    # -------------------------------------------------
     st.markdown("---")
     st.markdown("## Overall Contract Risk Assessment")
 
-    if risk_counts["High"] > 0:
-        overall_risk = "High Risk"
-        st.error("High Risk Contract – immediate legal review recommended.")
-    elif risk_counts["Medium"] > 0:
-        overall_risk = "Medium Risk"
+    overall_risk = contract_risk_score(risk_levels)
+
+    if overall_risk == "High Risk":
+        st.error("High Risk Contract – legal review strongly recommended.")
+    elif overall_risk == "Medium Risk":
         st.warning("Medium Risk Contract – review key clauses carefully.")
     else:
-        overall_risk = "Low Risk"
         st.success("Low Risk Contract – no major legal concerns detected.")
 
-   
-    # Audit Log
-   
+    # -------------------------------------------------
+    # AUDIT LOG
+    # -------------------------------------------------
     audit_path = log_audit({
+        "language": language,
         "total_clauses": len(clauses),
-        "risk_counts": risk_counts,
+        "risk_levels": risk_levels,
         "overall_risk": overall_risk
     })
-
     st.caption(f"Audit log saved at: {audit_path}")
 
-
-    # PDF Export
-    
+    # -------------------------------------------------
+    # PDF EXPORT
+    # -------------------------------------------------
     if st.button("Export Risk Summary as PDF"):
         pdf_path = generate_pdf(
             overall_risk=overall_risk,
             total_clauses=len(clauses)
         )
+
         with open(pdf_path, "rb") as f:
             st.download_button(
-                label="Download PDF",
-                data=f,
+                "Download PDF",
+                f,
                 file_name="contract_risk_summary.pdf",
                 mime="application/pdf"
             )
