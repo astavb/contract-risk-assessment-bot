@@ -1,0 +1,6 @@
+streamlit
+spacy
+python-docx
+PyPDF2
+langdetect
+reportlab
