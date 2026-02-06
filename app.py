@@ -2,11 +2,7 @@ import streamlit as st
 
 from utils import extract_text, detect_language
 from clause_extraction import extract_clauses
-from risk_engine import (
-    detect_clause_types,
-    assess_risk_level,
-    contract_risk_score
-)
+from risk_engine import detect_clause_types, assess_risk_level, contract_risk_score
 from nlp_pipeline import analyze_clause
 from pdf_export import generate_pdf
 from audit_logger import save_audit_log
@@ -19,6 +15,37 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+.nav-bar {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0 30px 0;
+    position: sticky;
+    top: 0;
+    background: #020617;
+    padding: 14px;
+    border-radius: 16px;
+    z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.nav-item {
+    padding: 10px 18px;
+    border-radius: 12px;
+    color: #cbd5f5;
+    font-weight: 600;
+    text-decoration: none;
+    background: #020617;
+    transition: all 0.25s ease;
+}
+.nav-item:hover {
+    background: #1e293b;
+}
+.nav-item.active {
+    background: #2563eb;
+    color: #ffffff;
+}
+.section-anchor {
+    scroll-margin-top: 140px;
+}
 .qa-card {
     background: linear-gradient(145deg, #0f172a, #020617);
     border-radius: 14px;
@@ -37,6 +64,28 @@ st.markdown("""
     line-height: 1.6;
 }
 </style>
+
+<script>
+const observer = new IntersectionObserver(
+    entries => {
+        entries.forEach(entry => {
+            const id = entry.target.getAttribute("id");
+            const navItem = document.querySelector(`a[href="#${id}"]`);
+            if (entry.isIntersecting) {
+                document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+                if (navItem) navItem.classList.add("active");
+            }
+        });
+    },
+    { threshold: 0.6 }
+);
+
+window.addEventListener("load", () => {
+    document.querySelectorAll(".section-anchor").forEach(section => {
+        observer.observe(section);
+    });
+});
+</script>
 """, unsafe_allow_html=True)
 
 
@@ -102,6 +151,16 @@ if uploaded_file:
         col3.metric("Medium Risk", risk_levels.count("Medium"))
         col4.metric("Low Risk", risk_levels.count("Low"))
 
+        st.markdown("""
+        <div class="nav-bar">
+            <a href="#business-questions" class="nav-item">Business Questions</a>
+            <a href="#clause-analysis" class="nav-item">Clause Details</a>
+            <a href="#final-risk" class="nav-item">Risk Decision</a>
+            <a href="#download-report" class="nav-item">Download Report</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div id="business-questions" class="section-anchor"></div>', unsafe_allow_html=True)
         st.subheader("Business Risk Questions")
 
         with st.expander("Is this contract safe for my business?"):
@@ -110,7 +169,7 @@ if uploaded_file:
                 <div class="qa-question">Overall Risk Assessment</div>
                 <div class="qa-answer">
                     This contract is classified as <strong>{overall_risk}</strong>.
-                    Business owners should carefully review critical clauses before proceeding.
+                    Review critical clauses carefully before proceeding.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -123,7 +182,7 @@ if uploaded_file:
                 <div class="qa-answer">
                     {"High-risk clauses related to penalties or liabilities were detected."
                     if high_risk else
-                    "No major financial penalty or liability risks were detected."}
+                    "No major financial risks detected."}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -134,26 +193,9 @@ if uploaded_file:
             <div class="qa-card">
                 <div class="qa-question">Termination Rights</div>
                 <div class="qa-answer">
-                    {"The contract allows one-sided termination, which may be risky."
+                    {"The contract allows one-sided termination."
                     if unilateral else
-                    "No unfair unilateral termination rights were detected."}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with st.expander("Are there lock-in or auto-renewal risks?"):
-            lockin = any(
-                t in ["Lock-in Period", "Auto-Renewal"]
-                for c in clause_results
-                for t in c["types"]
-            )
-            st.markdown(f"""
-            <div class="qa-card">
-                <div class="qa-question">Contract Duration</div>
-                <div class="qa-answer">
-                    {"Lock-in or auto-renewal clauses were found and should be reviewed carefully."
-                    if lockin else
-                    "No lock-in or auto-renewal risks detected."}
+                    "No unfair termination rights detected."}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -163,12 +205,13 @@ if uploaded_file:
             <div class="qa-card">
                 <div class="qa-question">Renegotiation Advice</div>
                 <div class="qa-answer">
-                    High-risk clauses related to termination, penalties, indemnity,
-                    or intellectual property should be renegotiated.
+                    Focus on clauses related to termination, penalties, indemnity,
+                    and intellectual property.
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
+        st.markdown('<div id="clause-analysis" class="section-anchor"></div>', unsafe_allow_html=True)
         st.subheader("Clause-by-Clause Analysis")
 
         for clause in clause_results:
@@ -195,6 +238,7 @@ if uploaded_file:
             st.info(clause["explanation"])
             st.markdown(f"**Why it matters:** {clause['why_it_matters']}")
 
+        st.markdown('<div id="final-risk" class="section-anchor"></div>', unsafe_allow_html=True)
         st.subheader("Overall Contract Risk Assessment")
 
         if overall_risk == "High Risk":
@@ -208,9 +252,9 @@ if uploaded_file:
             "overall_risk": overall_risk,
             "total_clauses": len(clause_results)
         })
-
         st.caption(f"Audit log saved at: {audit_path}")
 
+        st.markdown('<div id="download-report" class="section-anchor"></div>', unsafe_allow_html=True)
         if st.button("Export Risk Summary as PDF"):
             pdf_path = generate_pdf(
                 overall_risk=overall_risk,
@@ -223,4 +267,5 @@ if uploaded_file:
                     file_name="contract_risk_summary.pdf",
                     mime="application/pdf"
                 )
+
 
