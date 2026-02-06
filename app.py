@@ -34,7 +34,6 @@ st.markdown("""
     font-weight: 600;
     text-decoration: none;
     background: #020617;
-    transition: all 0.25s ease;
 }
 .nav-item:hover {
     background: #1e293b;
@@ -62,6 +61,38 @@ st.markdown("""
     margin-top: 14px;
     color: #cbd5f5;
     line-height: 1.6;
+}
+.decision-card {
+    background: linear-gradient(145deg, #020617, #0f172a);
+    border-radius: 18px;
+    padding: 26px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    margin-top: 20px;
+}
+.decision-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e5e7eb;
+}
+.decision-status {
+    margin-top: 10px;
+    font-size: 22px;
+    font-weight: 800;
+}
+.decision-safe {
+    color: #22c55e;
+}
+.decision-review {
+    color: #f59e0b;
+}
+.decision-danger {
+    color: #ef4444;
+}
+.risk-story {
+    margin-top: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #cbd5f5;
 }
 </style>
 
@@ -241,12 +272,44 @@ if uploaded_file:
         st.markdown('<div id="final-risk" class="section-anchor"></div>', unsafe_allow_html=True)
         st.subheader("Overall Contract Risk Assessment")
 
+        high_count = risk_levels.count("High")
+        medium_count = risk_levels.count("Medium")
+
         if overall_risk == "High Risk":
-            st.error("High Risk Contract – urgent legal review recommended.")
+            decision = "Do Not Sign Without Legal Review"
+            decision_class = "decision-danger"
+            story = (
+                "This contract contains multiple high-risk clauses that may expose your business "
+                "to financial loss or one-sided obligations."
+            )
         elif overall_risk == "Medium Risk":
-            st.warning("Medium Risk Contract – review key clauses carefully.")
+            decision = "Review Before Signing"
+            decision_class = "decision-review"
+            story = (
+                "This contract includes some clauses that require attention. Reviewing and "
+                "renegotiating key terms is recommended."
+            )
         else:
-            st.success("Low Risk Contract – no major legal concerns detected.")
+            decision = "Safe to Sign"
+            decision_class = "decision-safe"
+            story = (
+                "This contract does not contain major legal or financial risks and appears balanced."
+            )
+
+        st.markdown(f"""
+        <div class="decision-card">
+            <div class="decision-title">Business Decision Readiness</div>
+            <div class="decision-status {decision_class}">
+                {decision}
+            </div>
+            <div class="risk-story">
+                <strong>Why this decision:</strong><br>
+                Out of {len(clause_results)} clauses reviewed, {high_count} were identified as high risk
+                and {medium_count} as medium risk.<br><br>
+                {story}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         audit_path = save_audit_log({
             "overall_risk": overall_risk,
@@ -267,5 +330,6 @@ if uploaded_file:
                     file_name="contract_risk_summary.pdf",
                     mime="application/pdf"
                 )
+
 
 
