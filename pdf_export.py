@@ -1,5 +1,5 @@
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from datetime import datetime
@@ -11,7 +11,17 @@ def generate_pdf(
     total_clauses,
     contract_type="General Contract",
     language="English",
+    risk_summary=None
 ):
+    if risk_summary is None:
+        risk_summary = {
+            "Penalty Clauses": True,
+            "Indemnity Clauses": True,
+            "Termination Risks": True,
+            "IP Ownership Risks": True,
+            "Arbitration / Jurisdiction": True
+        }
+
     os.makedirs("pdf_reports", exist_ok=True)
     file_path = f"pdf_reports/contract_risk_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
@@ -27,63 +37,67 @@ def generate_pdf(
     styles = getSampleStyleSheet()
     elements = []
 
-    # ---------- COVER HEADER ----------
-    header = Table(
-        [[Paragraph(
-            "Contract Risk Assessment Report",
-            ParagraphStyle(
-                "Header",
-                fontSize=24,
-                textColor=colors.white,
-                alignment=1,
-                fontName="Helvetica-Bold"
-            )
-        )]],
+    title_style = ParagraphStyle(
+        "TitleStyle",
+        fontSize=22,
+        textColor=colors.white,
+        alignment=1,
+        spaceAfter=20
+    )
+
+    header_bg = Table(
+        [[Paragraph("Contract Risk Assessment Summary", title_style)]],
         colWidths=[480]
     )
-
-    header.setStyle(TableStyle([
+    header_bg.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
-        ("PADDING", (0, 0), (-1, -1), 20)
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("PADDING", (0, 0), (-1, -1), 18)
     ]))
 
-    elements.append(header)
-    elements.append(Spacer(1, 18))
+    elements.append(header_bg)
+    elements.append(Spacer(1, 20))
 
-    elements.append(Paragraph(
-        f"Generated on {datetime.now().strftime('%d %b %Y, %H:%M')}",
-        ParagraphStyle("Meta", fontSize=10, textColor=colors.grey)
-    ))
-
-    elements.append(Spacer(1, 24))
-
-    # ---------- CONTRACT INFO CARD ----------
-    elements.append(Paragraph(
-        "Contract Information",
-        ParagraphStyle("Section", fontSize=15, fontName="Helvetica-Bold")
-    ))
-
-    info_table = Table(
-        [
-            ["Contract Type", contract_type],
-            ["Detected Language", language],
-            ["Total Clauses Analyzed", str(total_clauses)]
-        ],
-        colWidths=[180, 300]
+    meta_style = ParagraphStyle(
+        "Meta",
+        fontSize=10,
+        textColor=colors.grey
     )
 
-    info_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
-        ("FONT", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("PADDING", (0, 0), (-1, -1), 10)
-    ]))
+    elements.append(Paragraph(
+        f"Generated on: {datetime.now().strftime('%d %b %Y, %H:%M')}",
+        meta_style
+    ))
 
-    elements.append(Spacer(1, 12))
-    elements.append(info_table)
-    elements.append(Spacer(1, 26))
+    elements.append(Spacer(1, 20))
 
-    # ---------- RISK BADGE ----------
+    section_style = ParagraphStyle(
+        "Section",
+        fontSize=14,
+        textColor=colors.HexColor("#0f172a"),
+        spaceAfter=10,
+        spaceBefore=20,
+        fontName="Helvetica-Bold"
+    )
+
+    body_style = ParagraphStyle(
+        "Body",
+        fontSize=11,
+        leading=16
+    )
+
+    elements.append(Paragraph("Contract Information", section_style))
+    elements.append(Paragraph(
+        f"""
+        <b>Contract Type:</b> {contract_type}<br/>
+        <b>Detected Language:</b> {language}<br/>
+        <b>Total Clauses Analyzed:</b> {total_clauses}
+        """,
+        body_style
+    ))
+
+    elements.append(Spacer(1, 16))
+
     risk_color = (
         colors.red if overall_risk == "High Risk"
         else colors.orange if overall_risk == "Medium Risk"
@@ -91,55 +105,77 @@ def generate_pdf(
     )
 
     risk_box = Table(
-        [[Paragraph(
-            f"Overall Contract Risk: {overall_risk}",
-            ParagraphStyle(
-                "Risk",
-                fontSize=14,
-                textColor=colors.white,
-                alignment=1,
-                fontName="Helvetica-Bold"
-            )
-        )]],
+        [[Paragraph(f"Overall Contract Risk Level: {overall_risk}", ParagraphStyle(
+            "Risk",
+            fontSize=14,
+            textColor=colors.white,
+            alignment=1,
+            fontName="Helvetica-Bold"
+        ))]],
         colWidths=[480]
     )
 
     risk_box.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), risk_color),
-        ("PADDING", (0, 0), (-1, -1), 14),
-        ("TOPPADDING", (0, 0), (-1, -1), 16),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+        ("PADDING", (0, 0), (-1, -1), 14)
     ]))
 
     elements.append(risk_box)
-    elements.append(Spacer(1, 30))
 
-    # ---------- EXECUTIVE SUMMARY ----------
-    elements.append(Paragraph(
-        "Executive Summary",
-        ParagraphStyle("Section", fontSize=15, fontName="Helvetica-Bold")
-    ))
+    elements.append(Spacer(1, 20))
 
-    elements.append(Spacer(1, 10))
-
+    elements.append(Paragraph("Executive Summary", section_style))
     elements.append(Paragraph(
         """
-        This contract has been automatically reviewed using an AI-assisted legal risk
-        assessment engine designed specifically for small and medium businesses.
+        This contract was automatically analyzed using an AI-assisted legal risk assessment engine
+        designed for small and medium businesses. The analysis identifies potential legal, financial,
+        and operational risks based on common contractual patterns.
         <br/><br/>
-        The analysis identifies potential legal, financial, and operational risks based on
-        common contractual patterns such as penalties, termination rights, indemnities,
-        intellectual property ownership, and dispute resolution clauses.
-        <br/><br/>
-        Business owners are strongly advised to carefully review high-risk clauses and seek
-        professional legal advice before signing or renewing the agreement.
+        The assessment highlights clauses related to penalties, termination rights, indemnities,
+        intellectual property ownership, and dispute resolution mechanisms. Business owners are
+        strongly advised to review high-risk clauses carefully and seek professional legal advice
+        before signing.
         """,
-        ParagraphStyle("Body", fontSize=11, leading=16)
+        body_style
     ))
 
-    elements.append(Spacer(1, 40))
+    elements.append(PageBreak())
 
-    # ---------- DISCLAIMER ----------
+    elements.append(Paragraph("Key Risk Areas Detected", section_style))
+
+    risk_table_data = [["Risk Area", "Detected"]]
+    for k, v in risk_summary.items():
+        risk_table_data.append([k, "Yes" if v else "No"])
+
+    risk_table = Table(risk_table_data, colWidths=[300, 180])
+    risk_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER")
+    ]))
+
+    elements.append(risk_table)
+
+    elements.append(PageBreak())
+
+    elements.append(Paragraph("Business Recommendations", section_style))
+    elements.append(Paragraph(
+        """
+        <b>Recommended Actions:</b><br/><br/>
+        • Review all high-risk clauses carefully before signing.<br/>
+        • Renegotiate one-sided termination, penalty, or indemnity clauses.<br/>
+        • Clarify intellectual property ownership and usage rights.<br/>
+        • Ensure dispute resolution and jurisdiction terms are acceptable.<br/><br/>
+        <b>Signing Guidance:</b><br/>
+        This report is intended to assist decision-making but should not replace professional
+        legal consultation for critical contracts.
+        """,
+        body_style
+    ))
+
+    elements.append(Spacer(1, 30))
+
     elements.append(Paragraph(
         "<i>Disclaimer: This report is generated for informational purposes only and does not constitute legal advice.</i>",
         ParagraphStyle("Disclaimer", fontSize=9, textColor=colors.grey)
@@ -147,5 +183,6 @@ def generate_pdf(
 
     doc.build(elements)
     return file_path
+
 
 
